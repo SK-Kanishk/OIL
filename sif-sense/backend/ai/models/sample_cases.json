@@ -1,0 +1,68 @@
+[
+  {
+    "id": "osha-amp-01",
+    "category": "Machinery Entanglement & Amputation",
+    "severity": "CRITICAL SIF",
+    "badge": "CRITICAL SIF",
+    "employer": "Industrial Manufacturing Plant",
+    "narrative": "An employee operating a conveyor belt reached to clear jammed material while the system was still energized. The employee's right hand was caught in the rotating nip points, resulting in traumatic amputation of two fingers.",
+    "actual_nature": "Amputation",
+    "actual_outcome": "Amputation: 1, Hospitalized: 1",
+    "expected_sif": true
+  },
+  {
+    "id": "osha-fall-02",
+    "category": "Fall from Height / Scaffolding",
+    "severity": "CRITICAL SIF",
+    "badge": "CRITICAL SIF",
+    "employer": "Commercial Construction LLC",
+    "narrative": "A carpenter was installing exterior siding from a mobile scaffold at an elevation of 18 feet. The scaffold lacked complete guardrails and the worker was not wearing a fall arrest harness. The worker lost balance and fell to the concrete slab below, sustaining severe cranial trauma and multiple fractured ribs.",
+    "actual_nature": "Fracture / Brain Trauma",
+    "actual_outcome": "Hospitalized: 1, Severe Trauma",
+    "expected_sif": true
+  },
+  {
+    "id": "osha-elec-03",
+    "category": "Electrical Arc Flash / Energized Work",
+    "severity": "CRITICAL SIF",
+    "badge": "CRITICAL SIF",
+    "employer": "Power & Utility Contracting",
+    "narrative": "An electrician was troubleshooting a 480-volt distribution switchgear without de-energizing or performing Lockout/Tagout. A tool slipped causing an electrical arc flash explosion. The employee sustained second and third-degree thermal burns to the face, neck, and upper torso.",
+    "actual_nature": "Thermal / Chemical Burn",
+    "actual_outcome": "Hospitalized: 1, Inpatient Burn ICU",
+    "expected_sif": true
+  },
+  {
+    "id": "osha-crane-04",
+    "category": "Suspended Load / Crush Hazard",
+    "severity": "HIGH RISK SIF",
+    "badge": "HIGH RISK",
+    "employer": "Steel Logistics & Distribution",
+    "narrative": "During an overhead crane lift of a 3-ton bundle of steel pipes, the synthetic rigging sling failed. The suspended bundle dropped into the staging bay, striking a ground rigger on the lower extremities and pinning the worker against a stanchion.",
+    "actual_nature": "Crushing Injury",
+    "actual_outcome": "Hospitalized: 1, Crush Trauma",
+    "expected_sif": true
+  },
+  {
+    "id": "osha-gas-05",
+    "category": "Confined Space / Toxic Gas",
+    "severity": "HIGH RISK SIF",
+    "badge": "HIGH RISK",
+    "employer": "Petrochemical Terminal Services",
+    "narrative": "Two technicians entered a storage vessel to conduct internal weld inspections without atmospheric gas testing or ventilation. Both workers were overcome by nitrogen vapor displacement and oxygen deficiency, experiencing loss of consciousness before being rescued.",
+    "actual_nature": "Chemical / Gas Inhalation",
+    "actual_outcome": "Hospitalized: 2, Acute Respiratory Distress",
+    "expected_sif": true
+  },
+  {
+    "id": "osha-minor-06",
+    "category": "Minor Scratch / First Aid",
+    "severity": "LOW RISK",
+    "badge": "LOW RISK",
+    "employer": "Corporate Facility Office",
+    "narrative": "An administrative staff member was moving empty cardboard boxes in the office supply room and sustained a minor paper cut to the index finger. Cleaned wound with first aid antiseptic wipe, no medical treatment or lost work time required.",
+    "actual_nature": "Minor Scratch",
+    "actual_outcome": "Hospitalized: 0, Amputation: 0, First Aid Only",
+    "expected_sif": false
+  }
+]

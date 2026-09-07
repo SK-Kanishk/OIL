@@ -1,0 +1,623 @@
+{
+  "dataset_name": "OSHA Severe Injury Reports (2015\u20132025)",
+  "total_records": 105995,
+  "train_samples": 84796,
+  "test_samples": 21199,
+  "accuracy": 0.96,
+  "precision": 0.9718,
+  "recall": 0.9749,
+  "f1_score": 0.9733,
+  "roc_auc": 0.9876,
+  "confusion_matrix": {
+    "true_negative": 4907,
+    "false_positive": 449,
+    "false_negative": 398,
+    "true_positive": 15445
+  },
+  "top_sif_risk_terms": [
+    {
+      "term": "fractured",
+      "weight": 24.4755
+    },
+    {
+      "term": "fracture",
+      "weight": 23.3237
+    },
+    {
+      "term": "amputated",
+      "weight": 22.7963
+    },
+    {
+      "term": "broken",
+      "weight": 21.8729
+    },
+    {
+      "term": "amputation",
+      "weight": 21.0011
+    },
+    {
+      "term": "fractures",
+      "weight": 20.1855
+    },
+    {
+      "term": "fracturing",
+      "weight": 18.9827
+    },
+    {
+      "term": "breaking",
+      "weight": 18.9444
+    },
+    {
+      "term": "burns",
+      "weight": 15.3299
+    },
+    {
+      "term": "concussion",
+      "weight": 13.618
+    },
+    {
+      "term": "amputating",
+      "weight": 12.9758
+    },
+    {
+      "term": "crushed",
+      "weight": 11.2232
+    },
+    {
+      "term": "fingertip",
+      "weight": 10.7164
+    },
+    {
+      "term": "brain",
+      "weight": 10.4132
+    },
+    {
+      "term": "head injury",
+      "weight": 10.0189
+    },
+    {
+      "term": "broke",
+      "weight": 9.658
+    },
+    {
+      "term": "crushing",
+      "weight": 9.4823
+    },
+    {
+      "term": "burned",
+      "weight": 9.0813
+    },
+    {
+      "term": "amputations",
+      "weight": 7.6117
+    },
+    {
+      "term": "burn",
+      "weight": 6.9121
+    },
+    {
+      "term": "suffered broken",
+      "weight": 6.6933
+    },
+    {
+      "term": "finger",
+      "weight": 6.35
+    },
+    {
+      "term": "resulting amputation",
+      "weight": 6.087
+    },
+    {
+      "term": "femur",
+      "weight": 5.7202
+    },
+    {
+      "term": "shock",
+      "weight": 5.7077
+    },
+    {
+      "term": "suffering broken",
+      "weight": 5.4858
+    },
+    {
+      "term": "tibia",
+      "weight": 5.4588
+    },
+    {
+      "term": "burning",
+      "weight": 5.3029
+    },
+    {
+      "term": "shocked",
+      "weight": 5.0174
+    },
+    {
+      "term": "head",
+      "weight": 4.8515
+    },
+    {
+      "term": "hot",
+      "weight": 4.8199
+    },
+    {
+      "term": "crush",
+      "weight": 4.707
+    },
+    {
+      "term": "fractured right",
+      "weight": 4.6582
+    },
+    {
+      "term": "fingers",
+      "weight": 4.6108
+    },
+    {
+      "term": "cracked",
+      "weight": 4.5852
+    },
+    {
+      "term": "broke left",
+      "weight": 4.5182
+    },
+    {
+      "term": "hospitalized broken",
+      "weight": 4.5148
+    },
+    {
+      "term": "injured employee",
+      "weight": 4.2724
+    },
+    {
+      "term": "tip",
+      "weight": 4.2442
+    },
+    {
+      "term": "partial",
+      "weight": 4.2377
+    },
+    {
+      "term": "head trauma",
+      "weight": 4.189
+    },
+    {
+      "term": "thumb",
+      "weight": 4.1692
+    },
+    {
+      "term": "broke right",
+      "weight": 4.146
+    },
+    {
+      "term": "resulting broken",
+      "weight": 4.1191
+    },
+    {
+      "term": "broken right",
+      "weight": 4.0745
+    },
+    {
+      "term": "fractured left",
+      "weight": 4.0609
+    },
+    {
+      "term": "fingertips",
+      "weight": 4.0347
+    },
+    {
+      "term": "hospitalized fractured",
+      "weight": 3.8922
+    },
+    {
+      "term": "broken left",
+      "weight": 3.8503
+    },
+    {
+      "term": "bones",
+      "weight": 3.8417
+    },
+    {
+      "term": "partial amputation",
+      "weight": 3.8044
+    },
+    {
+      "term": "employees",
+      "weight": 3.7536
+    },
+    {
+      "term": "avulsion",
+      "weight": 3.7249
+    },
+    {
+      "term": "chemical burns",
+      "weight": 3.6815
+    },
+    {
+      "term": "employees hospitalized",
+      "weight": 3.6563
+    },
+    {
+      "term": "broke leg",
+      "weight": 3.5638
+    },
+    {
+      "term": "breaking left",
+      "weight": 3.532
+    },
+    {
+      "term": "finger amputated",
+      "weight": 3.5147
+    },
+    {
+      "term": "fell broke",
+      "weight": 3.5143
+    },
+    {
+      "term": "fibula",
+      "weight": 3.5031
+    },
+    {
+      "term": "knuckle",
+      "weight": 3.4902
+    },
+    {
+      "term": "resulting fractured",
+      "weight": 3.4785
+    },
+    {
+      "term": "broken leg",
+      "weight": 3.4505
+    },
+    {
+      "term": "degree",
+      "weight": 3.4431
+    },
+    {
+      "term": "vertebra",
+      "weight": 3.4089
+    },
+    {
+      "term": "skull",
+      "weight": 3.3983
+    },
+    {
+      "term": "resulting",
+      "weight": 3.3592
+    },
+    {
+      "term": "pelvis",
+      "weight": 3.3529
+    },
+    {
+      "term": "ankle",
+      "weight": 3.34
+    },
+    {
+      "term": "fingertip amputation",
+      "weight": 3.3317
+    },
+    {
+      "term": "fracturing left",
+      "weight": 3.2937
+    },
+    {
+      "term": "sustained broken",
+      "weight": 3.2714
+    },
+    {
+      "term": "broken hip",
+      "weight": 3.2663
+    },
+    {
+      "term": "breaking right",
+      "weight": 3.2566
+    },
+    {
+      "term": "sustained fractured",
+      "weight": 3.2488
+    },
+    {
+      "term": "bone",
+      "weight": 3.1769
+    },
+    {
+      "term": "sustained fractures",
+      "weight": 3.1628
+    },
+    {
+      "term": "partially amputated",
+      "weight": 3.152
+    },
+    {
+      "term": "anaphylactic",
+      "weight": 3.1292
+    },
+    {
+      "term": "laceration fracture",
+      "weight": 3.1168
+    },
+    {
+      "term": "toes",
+      "weight": 3.1016
+    },
+    {
+      "term": "crushing injuries",
+      "weight": 3.0909
+    },
+    {
+      "term": "ground breaking",
+      "weight": 3.0902
+    },
+    {
+      "term": "flash",
+      "weight": 3.0709
+    },
+    {
+      "term": "ignited",
+      "weight": 3.0408
+    },
+    {
+      "term": "hip fracture",
+      "weight": 3.0397
+    },
+    {
+      "term": "multiple fractures",
+      "weight": 3.0189
+    },
+    {
+      "term": "ground fracturing",
+      "weight": 3.0072
+    },
+    {
+      "term": "brain bleed",
+      "weight": 3.0022
+    },
+    {
+      "term": "finger amputation",
+      "weight": 2.9523
+    },
+    {
+      "term": "crush injury",
+      "weight": 2.9387
+    },
+    {
+      "term": "fingertip amputated",
+      "weight": 2.9213
+    },
+    {
+      "term": "vertebrae",
+      "weight": 2.9063
+    },
+    {
+      "term": "broke hip",
+      "weight": 2.8834
+    },
+    {
+      "term": "crushing injury",
+      "weight": 2.8575
+    },
+    {
+      "term": "hot water",
+      "weight": 2.8474
+    },
+    {
+      "term": "smashed",
+      "weight": 2.7879
+    },
+    {
+      "term": "amputated employee",
+      "weight": 2.7743
+    },
+    {
+      "term": "suffered burns",
+      "weight": 2.7647
+    },
+    {
+      "term": "amputation left",
+      "weight": 2.761
+    }
+  ],
+  "top_non_sif_terms": [
+    {
+      "term": "lacerated",
+      "weight": -11.4082
+    },
+    {
+      "term": "lung",
+      "weight": -11.203
+    },
+    {
+      "term": "injuring",
+      "weight": -8.3201
+    },
+    {
+      "term": "injury",
+      "weight": -8.0465
+    },
+    {
+      "term": "punctured",
+      "weight": -7.8983
+    },
+    {
+      "term": "laceration",
+      "weight": -7.6048
+    },
+    {
+      "term": "injuries",
+      "weight": -7.5886
+    },
+    {
+      "term": "lacerating",
+      "weight": -7.0849
+    },
+    {
+      "term": "spleen",
+      "weight": -6.9143
+    },
+    {
+      "term": "injured",
+      "weight": -6.8764
+    },
+    {
+      "term": "lungs",
+      "weight": -5.3801
+    },
+    {
+      "term": "contusion",
+      "weight": -5.2529
+    },
+    {
+      "term": "heat",
+      "weight": -5.1653
+    },
+    {
+      "term": "dehydration",
+      "weight": -5.1603
+    },
+    {
+      "term": "pneumothorax",
+      "weight": -5.018
+    },
+    {
+      "term": "lacerations",
+      "weight": -4.7092
+    },
+    {
+      "term": "tendon",
+      "weight": -4.6364
+    },
+    {
+      "term": "liver",
+      "weight": -4.6332
+    },
+    {
+      "term": "cut",
+      "weight": -4.5483
+    },
+    {
+      "term": "pain",
+      "weight": -4.5294
+    },
+    {
+      "term": "puncturing",
+      "weight": -4.4309
+    },
+    {
+      "term": "internal bleeding",
+      "weight": -4.3717
+    },
+    {
+      "term": "collapsed lung",
+      "weight": -4.3391
+    },
+    {
+      "term": "punctured lung",
+      "weight": -4.2254
+    },
+    {
+      "term": "contusions",
+      "weight": -4.0063
+    },
+    {
+      "term": "resulting injury",
+      "weight": -3.9933
+    },
+    {
+      "term": "internal",
+      "weight": -3.9624
+    },
+    {
+      "term": "resulting laceration",
+      "weight": -3.9517
+    },
+    {
+      "term": "strain",
+      "weight": -3.9286
+    },
+    {
+      "term": "injected",
+      "weight": -3.8947
+    },
+    {
+      "term": "bitten",
+      "weight": -3.8734
+    },
+    {
+      "term": "shot",
+      "weight": -3.8318
+    },
+    {
+      "term": "kidney",
+      "weight": -3.8196
+    },
+    {
+      "term": "dislocated",
+      "weight": -3.7617
+    },
+    {
+      "term": "collapsed",
+      "weight": -3.6672
+    },
+    {
+      "term": "hernia",
+      "weight": -3.6581
+    },
+    {
+      "term": "damage",
+      "weight": -3.4821
+    },
+    {
+      "term": "bit",
+      "weight": -3.3827
+    },
+    {
+      "term": "bruising",
+      "weight": -3.3557
+    },
+    {
+      "term": "wound",
+      "weight": -3.3493
+    },
+    {
+      "term": "hip injury",
+      "weight": -3.3405
+    },
+    {
+      "term": "impaled",
+      "weight": -3.3328
+    },
+    {
+      "term": "muscle",
+      "weight": -3.2637
+    },
+    {
+      "term": "hospitalized",
+      "weight": -3.2338
+    },
+    {
+      "term": "infection",
+      "weight": -3.183
+    },
+    {
+      "term": "ruptured",
+      "weight": -3.1253
+    },
+    {
+      "term": "suffered injury",
+      "weight": -3.0822
+    },
+    {
+      "term": "tendons",
+      "weight": -2.9946
+    },
+    {
+      "term": "stabbed",
+      "weight": -2.993
+    },
+    {
+      "term": "artery",
+      "weight": -2.9448
+    }
+  ],
+  "training_duration_seconds": 8.07,
+  "last_trained": "2026-09-07 15:08:17 UTC"
+}
