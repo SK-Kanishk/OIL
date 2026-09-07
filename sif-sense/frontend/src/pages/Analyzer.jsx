@@ -159,7 +159,7 @@ Required Action: ${result.risk?.ai_recommendation}`;
       {/* Content Area */}
       <div className="analyzer-grid-desktop">
         {/* TAB 1: INPUT VIEW */}
-        <div className="analyzer-col" style={{ display: activeTab === 'input' ? 'block' : 'none' }}>
+        <div className={`analyzer-col ${activeTab === 'input' ? 'active-col' : ''}`}>
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -287,7 +287,7 @@ Required Action: ${result.risk?.ai_recommendation}`;
         </div>
 
         {/* TAB 2: RESULTS VIEW */}
-        <div className="analyzer-col" style={{ display: activeTab === 'result' ? 'block' : 'none' }}>
+        <div className={`analyzer-col ${activeTab === 'result' ? 'active-col' : ''}`}>
           <AnimatePresence>
             {!result && !loading ? (
               <div className="card" style={{

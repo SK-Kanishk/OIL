@@ -62,8 +62,25 @@ def load_osha_model():
         try:
             logger.info(f"Loading OSHA ML model from {MODEL_PATH}...")
             _model_bundle = joblib.load(MODEL_PATH)
+            
+            # Precompute coefficients once on load for sub-millisecond inference
+            vec = _model_bundle.get("vectorizer")
+            clf = _model_bundle.get("classifier")
+            if vec and clf and hasattr(clf, "calibrated_classifiers_"):
+                feature_names = vec.get_feature_names_out()
+                coefs = np.zeros(len(feature_names))
+                total = 0
+                for cc in clf.calibrated_classifiers_:
+                    if hasattr(cc.estimator, "coef_"):
+                        coefs += cc.estimator.coef_[0]
+                        total += 1
+                if total > 0:
+                    coefs /= total
+                _model_bundle["precomputed_coefs"] = coefs
+                _model_bundle["vocab"] = vec.vocabulary_
+
             _model_loaded = True
-            logger.info("OSHA 2015-2025 ML model loaded successfully.")
+            logger.info("OSHA 2015-2025 ML model loaded and optimized for instant inference.")
         except Exception as e:
             logger.error(f"Failed to load OSHA model: {e}")
             _model_bundle = None
@@ -81,39 +98,25 @@ def enable_dl_model():
     load_osha_model()
 
 
-def extract_risk_tokens(text: str, vectorizer, clf, top_n: int = 8) -> List[Dict[str, Any]]:
-    """Extract top risk tokens from the text that contributed positively to the SIF prediction."""
+def extract_risk_tokens(text: str, bundle, top_n: int = 8) -> List[Dict[str, Any]]:
+    """Instant lookup of top risk tokens using precomputed coefficients."""
     words = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
-    if not words or not hasattr(vectorizer, "vocabulary_"):
-        return []
-
-    vocab = vectorizer.vocabulary_
-    # Calculate average coefficient across calibrated estimators
-    feature_names = vectorizer.get_feature_names_out()
-    coefs = None
-    if hasattr(clf, "calibrated_classifiers_"):
-        total = 0
-        for cc in clf.calibrated_classifiers_:
-            if hasattr(cc.estimator, "coef_"):
-                if coefs is None:
-                    coefs = np.zeros(len(feature_names))
-                coefs += cc.estimator.coef_[0]
-                total += 1
-        if total > 0:
-            coefs /= total
-
-    if coefs is None:
+    vocab = bundle.get("vocab")
+    coefs = bundle.get("precomputed_coefs")
+    if not words or vocab is None or coefs is None:
         return []
 
     matched = {}
     for w in set(words):
-        if w in vocab:
-            idx = vocab[w]
+        idx = vocab.get(w)
+        if idx is not None:
             weight = float(coefs[idx])
             if weight > 0:
                 matched[w] = weight
 
-    # Sort descending by weight
+    if not matched:
+        return []
+
     sorted_tokens = sorted(matched.items(), key=lambda x: x[1], reverse=True)[:top_n]
     return [{"word": item[0], "weight": round(item[1], 3)} for item in sorted_tokens]
 
@@ -195,9 +198,8 @@ def classify(text: str, nlp_result: dict) -> dict:
                 x_cat = cat_vec.transform([text])
                 predicted_nature = str(cat_clf.predict(x_cat)[0])
 
-            # Extract top contributing words
-            import numpy as np
-            risk_tokens = extract_risk_tokens(text, vec, clf)
+            # Extract top contributing words instantaneously
+            risk_tokens = extract_risk_tokens(text, bundle)
 
             # Safety guardrail check: if text mentions unmistakable life-threatening conditions
             text_low = text.lower()

@@ -866,6 +866,13 @@ body {
 }
 
 /* ── RESPONSIVE ANALYZER SPLIT & TABS ── */
+.analyzer-col {
+  display: none;
+}
+.analyzer-col.active-col {
+  display: block;
+}
+
 @media (min-width: 860px) {
   .analyzer-grid-desktop {
     display: grid !important;
@@ -880,4 +887,5 @@ body {
     display: block !important;
   }
 }
+
 
