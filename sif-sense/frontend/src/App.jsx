@@ -29,6 +29,7 @@ const PAGE_META = {
 function Topbar({ onMenuClick, pendingAlerts, dbStatus, onOpenDbModal }) {
   const loc = useLocation();
   const meta = PAGE_META[loc.pathname] || { title: 'SIF-Sense AI', sub: '' };
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   return (
     <div className="topbar">
@@ -43,6 +44,126 @@ function Topbar({ onMenuClick, pendingAlerts, dbStatus, onOpenDbModal }) {
       </div>
 
       <div className="topbar-right">
+        {/* Download Bundle & PDFs Button */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setDownloadOpen(prev => !prev)}
+            style={{
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.25))',
+              border: '1px solid rgba(168, 85, 247, 0.45)',
+              borderRadius: 20,
+              padding: '5px 12px',
+              fontSize: '0.74rem',
+              color: '#d8b4fe',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.2s ease'
+            }}
+            title="Download full project zip and PDF documentation"
+          >
+            <span>📥 Download Project & PDFs</span>
+          </button>
+
+          {downloadOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '120%',
+                width: 270,
+                background: '#0f172a',
+                border: '1px solid rgba(148, 163, 184, 0.25)',
+                borderRadius: 12,
+                padding: '10px',
+                zIndex: 9999,
+                boxShadow: '0 12px 36px rgba(0,0,0,0.65)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8
+              }}
+            >
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Available Downloads
+              </div>
+
+              <a
+                href="http://localhost:8000/api/download/project-zip"
+                download="SIF_Sense_AI_Project_Bundle.zip"
+                onClick={() => setDownloadOpen(false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  color: '#f8fafc',
+                  textDecoration: 'none',
+                  fontSize: '0.78rem'
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>📦</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#a5b4fc' }}>Full Project (.zip)</div>
+                  <div style={{ fontSize: '0.67rem', color: '#cbd5e1' }}>Complete Code + Trained ML (2.5 MB)</div>
+                </div>
+              </a>
+
+              <a
+                href="http://localhost:8000/api/download/technical-pdf"
+                download="SIF_Sense_AI_Technical_Deep_Dive_and_Storage_Architecture.pdf"
+                onClick={() => setDownloadOpen(false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  color: '#f8fafc',
+                  textDecoration: 'none',
+                  fontSize: '0.78rem'
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>📄</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#38bdf8' }}>Architecture & Storage PDF</div>
+                  <div style={{ fontSize: '0.67rem', color: '#cbd5e1' }}>OSHA Science & 512MB Strategy</div>
+                </div>
+              </a>
+
+              <a
+                href="http://localhost:8000/api/download/user-guide-pdf"
+                download="SIF_Sense_AI_Complete_User_and_Operation_Guide.pdf"
+                onClick={() => setDownloadOpen(false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(52, 211, 153, 0.12)',
+                  border: '1px solid rgba(52, 211, 153, 0.25)',
+                  color: '#f8fafc',
+                  textDecoration: 'none',
+                  fontSize: '0.78rem'
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>📘</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#34d399' }}>User Operation Guide PDF</div>
+                  <div style={{ fontSize: '0.67rem', color: '#cbd5e1' }}>Page-by-page system manual</div>
+                </div>
+              </a>
+            </div>
+          )}
+        </div>
+
         {/* Database Pill */}
         <button
           onClick={onOpenDbModal}
@@ -144,6 +265,65 @@ function Sidebar({ open, onClose, dbStatus, onOpenDbModal }) {
             </div>
             <div className="ai-status-row" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               Click to configure / test
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <a
+              href="http://localhost:8000/api/download/project-zip"
+              download="SIF_Sense_AI_Project_Bundle.zip"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '6px 10px',
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2))',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                color: '#e2e8f0',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                textDecoration: 'none'
+              }}
+            >
+              <span>📦 Download Project (.zip)</span>
+            </a>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <a
+                href="http://localhost:8000/api/download/technical-pdf"
+                download="SIF_Sense_AI_Technical_Deep_Dive_and_Storage_Architecture.pdf"
+                style={{
+                  textAlign: 'center',
+                  padding: '5px 4px',
+                  borderRadius: 6,
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                  color: '#38bdf8',
+                  fontSize: '0.66rem',
+                  fontWeight: 600,
+                  textDecoration: 'none'
+                }}
+              >
+                📄 Tech PDF
+              </a>
+              <a
+                href="http://localhost:8000/api/download/user-guide-pdf"
+                download="SIF_Sense_AI_Complete_User_and_Operation_Guide.pdf"
+                style={{
+                  textAlign: 'center',
+                  padding: '5px 4px',
+                  borderRadius: 6,
+                  background: 'rgba(52, 211, 153, 0.1)',
+                  border: '1px solid rgba(52, 211, 153, 0.2)',
+                  color: '#34d399',
+                  fontSize: '0.66rem',
+                  fontWeight: 600,
+                  textDecoration: 'none'
+                }}
+              >
+                📘 Guide PDF
+              </a>
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -556,5 +557,48 @@ async def update_database_connection(req: DatabaseConfigRequest):
         "message": msg,
         "status": mongo_manager.get_status()
     }
+
+
+@app.get("/api/download/project-zip")
+async def download_project_zip():
+    zip_path = "/Users/mr.tom/Desktop/SIF_Sense_AI_Project_Bundle.zip"
+    if not os.path.exists(zip_path):
+        zip_path = "/Users/mr.tom/NLP/SIF_Sense_AI_Project_Bundle.zip"
+    if not os.path.exists(zip_path):
+        raise HTTPException(status_code=404, detail="Zip file not found")
+    return FileResponse(
+        path=zip_path,
+        filename="SIF_Sense_AI_Project_Bundle.zip",
+        media_type="application/zip"
+    )
+
+
+@app.get("/api/download/technical-pdf")
+async def download_technical_pdf():
+    pdf_path = "/Users/mr.tom/Desktop/SIF_Sense_AI_Technical_Deep_Dive_and_Storage_Architecture.pdf"
+    if not os.path.exists(pdf_path):
+        pdf_path = "/Users/mr.tom/NLP/SIF_Sense_AI_Technical_Deep_Dive_and_Storage_Architecture.pdf"
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Technical PDF not found")
+    return FileResponse(
+        path=pdf_path,
+        filename="SIF_Sense_AI_Technical_Deep_Dive_and_Storage_Architecture.pdf",
+        media_type="application/pdf"
+    )
+
+
+@app.get("/api/download/user-guide-pdf")
+async def download_user_guide_pdf():
+    pdf_path = "/Users/mr.tom/Desktop/SIF_Sense_AI_Complete_User_and_Operation_Guide.pdf"
+    if not os.path.exists(pdf_path):
+        pdf_path = "/Users/mr.tom/NLP/SIF_Sense_AI_Complete_User_and_Operation_Guide.pdf"
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="User guide PDF not found")
+    return FileResponse(
+        path=pdf_path,
+        filename="SIF_Sense_AI_Complete_User_and_Operation_Guide.pdf",
+        media_type="application/pdf"
+    )
+
 
 
