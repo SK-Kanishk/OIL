@@ -1,542 +1,1880 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { feedSimulatedIncident, generateSimulatedIncident, getModelStatus } from '../services/api';
+import {
+  feedSimulatedIncident,
+  getModelStatus
+} from '../services/api';
+
+/* =========================================================
+   SIF-SENSE — PREMIUM LIGHT INCIDENT SIMULATOR
+   ---------------------------------------------------------
+   Existing functionality preserved:
+   ✓ Continuous live incident stream
+   ✓ Single-step incident generation
+   ✓ Configurable stream interval
+   ✓ Severity/category selection
+   ✓ OSHA model status
+   ✓ SIF ratio
+   ✓ Average client latency
+   ✓ IOGP rule count
+   ✓ Latest 25 simulated events
+   ✓ Inspect incident in Analyzer
+   ✓ Clear feed
+   ========================================================= */
+
+const COLORS = {
+  navy: '#0F172A',
+  text: '#334155',
+  muted: '#64748B',
+  subtle: '#94A3B8',
+  border: '#E5EAF1',
+  borderStrong: '#D7DEE8',
+  surface: '#FFFFFF',
+  background: '#F8FAFC',
+
+  blue: '#2563EB',
+  blueSoft: '#EFF6FF',
+  blueBorder: '#BFDBFE',
+
+  indigo: '#4F46E5',
+  indigoSoft: '#EEF2FF',
+  indigoBorder: '#C7D2FE',
+
+  red: '#DC2626',
+  redSoft: '#FEF2F2',
+  redBorder: '#FECACA',
+
+  orange: '#EA580C',
+  orangeSoft: '#FFF7ED',
+  orangeBorder: '#FED7AA',
+
+  yellow: '#CA8A04',
+  yellowSoft: '#FEFCE8',
+  yellowBorder: '#FEF08A',
+
+  green: '#16A34A',
+  greenSoft: '#F0FDF4',
+  greenBorder: '#BBF7D0'
+};
+
+const SEVERITY_OPTIONS = [
+  {
+    id: 'ANY',
+    label: 'Random',
+    description: 'All incident types',
+    shortLabel: 'Random'
+  },
+  {
+    id: 'CRITICAL_SIF',
+    label: 'Critical SIF',
+    description: 'Critical SIF precursor',
+    shortLabel: 'Critical SIF'
+  },
+  {
+    id: 'HIGH_RISK_NEAR_MISS',
+    label: 'High-Potential',
+    description: 'High-risk near miss',
+    shortLabel: 'High Risk'
+  },
+  {
+    id: 'MEDIUM_PRECURSOR',
+    label: 'Medium Risk',
+    description: 'Operational precursor',
+    shortLabel: 'Medium'
+  },
+  {
+    id: 'LOW_OBSERVATION',
+    label: 'Low Risk',
+    description: 'Observation / low risk',
+    shortLabel: 'Low Risk'
+  }
+];
+
+const INTERVAL_OPTIONS = [2, 4, 6];
+
+function getRiskConfig(level) {
+  switch (String(level || '').toUpperCase()) {
+    case 'CRITICAL':
+      return {
+        label: 'Critical',
+        color: COLORS.red,
+        soft: COLORS.redSoft,
+        border: COLORS.redBorder
+      };
+
+    case 'HIGH':
+      return {
+        label: 'High',
+        color: COLORS.orange,
+        soft: COLORS.orangeSoft,
+        border: COLORS.orangeBorder
+      };
+
+    case 'MEDIUM':
+    case 'MODERATE':
+      return {
+        label: 'Medium',
+        color: COLORS.yellow,
+        soft: COLORS.yellowSoft,
+        border: COLORS.yellowBorder
+      };
+
+    default:
+      return {
+        label: 'Low',
+        color: COLORS.green,
+        soft: COLORS.greenSoft,
+        border: COLORS.greenBorder
+      };
+  }
+}
+
+function formatNumber(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return '—';
+  }
+
+  return number.toLocaleString();
+}
+
+function formatProbability(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return '0.0%';
+  }
+
+  const percentage = number <= 1 ? number * 100 : number;
+
+  return `${percentage.toFixed(1)}%`;
+}
+
+function getScore(incident) {
+  const value =
+    incident?.risk?.risk_score ??
+    incident?.risk?.score ??
+    0;
+
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : 0;
+}
+
+function getLevel(incident) {
+  return (
+    incident?.risk?.risk_level ||
+    incident?.risk?.level ||
+    'LOW'
+  );
+}
+
+function getIncidentNarrative(incident) {
+  return (
+    incident?.simulation?.narrative ||
+    incident?.preprocessing?.original ||
+    incident?.text ||
+    'No incident narrative available.'
+  );
+}
+
+function getIncidentKey(incident, index) {
+  return (
+    incident?.report_id ||
+    incident?.simulation?.uuid ||
+    incident?.id ||
+    `sim-${index}`
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  helper,
+  color,
+  soft,
+  icon
+}) {
+  return (
+    <div
+      style={{
+        background: COLORS.surface,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 17,
+        padding: '15px 16px',
+        boxShadow: '0 7px 25px rgba(15,23,42,0.035)',
+        minWidth: 0
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 10
+        }}
+      >
+        <div
+          style={{
+            color: COLORS.muted,
+            fontSize: '0.64rem',
+            fontWeight: 850,
+            textTransform: 'uppercase',
+            letterSpacing: '0.045em'
+          }}
+        >
+          {label}
+        </div>
+
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            display: 'grid',
+            placeItems: 'center',
+            borderRadius: 9,
+            background: soft,
+            color,
+            fontSize: '0.7rem',
+            fontWeight: 900
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 9,
+          color,
+          fontSize: '1.65rem',
+          lineHeight: 1,
+          fontWeight: 900,
+          letterSpacing: '-0.045em'
+        }}
+      >
+        {value}
+      </div>
+
+      <div
+        style={{
+          marginTop: 6,
+          color: COLORS.subtle,
+          fontSize: '0.67rem',
+          lineHeight: 1.35
+        }}
+      >
+        {helper}
+      </div>
+    </div>
+  );
+}
+
+function MetaChip({ label, value, tone = 'neutral' }) {
+  const tones = {
+    neutral: {
+      background: COLORS.background,
+      border: COLORS.border,
+      color: COLORS.text
+    },
+    blue: {
+      background: COLORS.blueSoft,
+      border: COLORS.blueBorder,
+      color: COLORS.blue
+    },
+    red: {
+      background: COLORS.redSoft,
+      border: COLORS.redBorder,
+      color: COLORS.red
+    },
+    green: {
+      background: COLORS.greenSoft,
+      border: COLORS.greenBorder,
+      color: COLORS.green
+    },
+    orange: {
+      background: COLORS.orangeSoft,
+      border: COLORS.orangeBorder,
+      color: COLORS.orange
+    }
+  };
+
+  const theme = tones[tone] || tones.neutral;
+
+  if (!value) return null;
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '5px 8px',
+        borderRadius: 8,
+        background: theme.background,
+        border: `1px solid ${theme.border}`,
+        color: theme.color,
+        fontSize: '0.64rem',
+        lineHeight: 1.2,
+        fontWeight: 700,
+        maxWidth: '100%'
+      }}
+    >
+      {label && (
+        <span style={{ opacity: 0.65 }}>
+          {label}
+        </span>
+      )}
+
+      <strong
+        style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {value}
+      </strong>
+    </span>
+  );
+}
 
 export default function Simulator() {
   const navigate = useNavigate();
+
   const [streamActive, setStreamActive] = useState(false);
   const [intervalSec, setIntervalSec] = useState(3);
   const [severityFilter, setSeverityFilter] = useState('ANY');
+
   const [incidents, setIncidents] = useState([]);
-  const [stats, setStats] = useState({ total: 0, sifCount: 0, avgLatency: 12 });
+
+  const [stats, setStats] = useState({
+    total: 0,
+    sifCount: 0,
+    avgLatency: 12
+  });
+
   const [modelStatus, setModelStatus] = useState(null);
   const [loadingStep, setLoadingStep] = useState(false);
-  
-  const timerRef = useRef(null);
+  const [streamError, setStreamError] = useState('');
 
-  useEffect(() => {
-    fetchModelStatus();
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+  const timerRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  /* =======================================================
+     MODEL STATUS
+     ======================================================= */
+
+  const fetchModelStatus = useCallback(async () => {
+    try {
+      const response = await getModelStatus();
+
+      if (mountedRef.current) {
+        setModelStatus(response?.data || null);
+      }
+    } catch (_) {
+      if (mountedRef.current) {
+        setModelStatus(null);
+      }
+    }
   }, []);
 
-  const fetchModelStatus = async () => {
-    try {
-      const res = await getModelStatus();
-      setModelStatus(res.data);
-    } catch (_) {}
-  };
+  useEffect(() => {
+    mountedRef.current = true;
 
-  const feedNextIncident = async () => {
+    fetchModelStatus();
+
+    return () => {
+      mountedRef.current = false;
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [fetchModelStatus]);
+
+  /* =======================================================
+     FEED ONE INCIDENT
+     ======================================================= */
+
+  const feedNextIncident = useCallback(async () => {
+    if (!mountedRef.current) return;
+
     try {
       setLoadingStep(true);
+      setStreamError('');
+
       const start = performance.now();
-      const res = await feedSimulatedIncident(severityFilter);
-      const latency = Math.round(performance.now() - start);
+
+      const response = await feedSimulatedIncident(
+        severityFilter
+      );
+
+      const latency = Math.round(
+        performance.now() - start
+      );
+
+      if (!response?.data) {
+        throw new Error('Simulator returned no data.');
+      }
 
       const newEntry = {
-        ...res.data,
+        ...response.data,
         receivedAt: new Date().toLocaleTimeString(),
         clientLatency: latency
       };
 
-      setIncidents(prev => [newEntry, ...prev.slice(0, 24)]);
-      setStats(prev => {
-        const newTotal = prev.total + 1;
-        const newSif = prev.sifCount + (res.data.classification?.sif_potential ? 1 : 0);
+      setIncidents((previous) => [
+        newEntry,
+        ...previous.slice(0, 24)
+      ]);
+
+      setStats((previous) => {
+        const newTotal = previous.total + 1;
+
+        const newSif =
+          previous.sifCount +
+          (response.data.classification?.sif_potential
+            ? 1
+            : 0);
+
         return {
           total: newTotal,
           sifCount: newSif,
-          avgLatency: Math.round((prev.avgLatency * prev.total + latency) / newTotal)
+          avgLatency: Math.round(
+            (
+              previous.avgLatency * previous.total +
+              latency
+            ) / newTotal
+          )
         };
       });
-    } catch (err) {
-      console.error('Simulator feed error:', err);
-    } finally {
-      setLoadingStep(false);
-    }
-  };
+    } catch (error) {
+      console.error('Simulator feed error:', error);
 
-  // Handle continuous stream toggle
-  useEffect(() => {
-    if (streamActive) {
-      // Feed first immediately
-      feedNextIncident();
-      timerRef.current = setInterval(() => {
-        feedNextIncident();
-      }, intervalSec * 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (mountedRef.current) {
+        setStreamError(
+          'Unable to generate the simulated incident. Check that the backend is running.'
+        );
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoadingStep(false);
+      }
     }
+  }, [severityFilter]);
+
+  /* =======================================================
+     CONTINUOUS STREAM
+     ======================================================= */
+
+  useEffect(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (!streamActive) {
+      return undefined;
+    }
+
+    feedNextIncident();
+
+    timerRef.current = setInterval(() => {
+      feedNextIncident();
+    }, intervalSec * 1000);
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [streamActive, intervalSec, severityFilter]);
+  }, [
+    streamActive,
+    intervalSec,
+    feedNextIncident
+  ]);
+
+  /* =======================================================
+     CONTROLS
+     ======================================================= */
 
   const clearFeed = () => {
     setIncidents([]);
-    setStats({ total: 0, sifCount: 0, avgLatency: 12 });
+
+    setStats({
+      total: 0,
+      sifCount: 0,
+      avgLatency: 12
+    });
+
+    setStreamError('');
+  };
+
+  const toggleStream = () => {
+    setStreamActive((current) => !current);
   };
 
   const handleInspectInAnalyzer = (incident) => {
-    // Navigate to analyzer with preloaded state
-    navigate('/', { state: { preloadedText: incident.simulation?.narrative || incident.preprocessing?.original } });
+    const narrative =
+      incident?.simulation?.narrative ||
+      incident?.preprocessing?.original ||
+      incident?.text ||
+      '';
+
+    navigate('/', {
+      state: {
+        preloadedText: narrative
+      }
+    });
   };
 
-  const sifRatio = stats.total > 0 ? Math.round((stats.sifCount / stats.total) * 100) : 0;
+  const sifRatio =
+    stats.total > 0
+      ? Math.round(
+          (stats.sifCount / stats.total) * 100
+        )
+      : 0;
+
+  const iogpCount = incidents.filter(
+    (incident) => {
+      const rule = incident?.risk?.iogp_rule;
+
+      return (
+        rule &&
+        !String(rule)
+          .toLowerCase()
+          .includes('general')
+      );
+    }
+  ).length;
+
+  const trainingRecords =
+    modelStatus?.total_training_records ||
+    105995;
 
   return (
-    <div className="page-container animate-fade-in" style={{ paddingBottom: '3.5rem' }}>
-      {/* Hero Control Center */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 16,
-        padding: '1.5rem',
-        marginBottom: '1.25rem',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          position: 'absolute', top: -40, right: -40, width: 220, height: 220,
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%)',
-          borderRadius: '50%', pointerEvents: 'none'
-        }} />
+    <div
+      className="page-container animate-fade-in"
+      style={{
+        paddingBottom: '4rem',
+        maxWidth: 1500,
+        margin: '0 auto',
+        color: COLORS.navy
+      }}
+    >
+      {/* =====================================================
+          PAGE HEADER
+          ===================================================== */}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{
-                background: 'rgba(99, 102, 241, 0.2)',
-                border: '1px solid rgba(99, 102, 241, 0.4)',
-                color: '#818cf8',
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                padding: '4px 10px',
-                borderRadius: 20,
-                letterSpacing: '0.05em'
-              }}>
-                🎮 INCIDENT STREAM SIMULATOR
-              </span>
-              <span style={{
-                background: streamActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.15)',
-                border: `1px solid ${streamActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)'}`,
-                color: streamActive ? '#34d399' : '#94a3b8',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                padding: '4px 10px',
-                borderRadius: 20,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}>
-                <span style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: streamActive ? '#34d399' : '#94a3b8',
-                  boxShadow: streamActive ? '0 0 8px #34d399' : 'none'
-                }} />
-                {streamActive ? 'LIVE STREAM RUNNING' : 'STREAM PAUSED'}
-              </span>
-            </div>
-            <h2 style={{ margin: 0, fontSize: '1.35rem', color: '#f8fafc', fontWeight: 800 }}>
-              Real-Time Procedural Safety Incident Generator
-            </h2>
-            <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-              Procedurally creates unique dates, operating sites, trades, and industrial narratives every cycle and feeds them through the trained OSHA ML model.
-            </p>
+      <section
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: 18,
+          flexWrap: 'wrap',
+          marginBottom: 22
+        }}
+      >
+        <div>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              padding: '6px 10px',
+              marginBottom: 9,
+              borderRadius: 999,
+              background: COLORS.indigoSoft,
+              border: `1px solid ${COLORS.indigoBorder}`,
+              color: COLORS.indigo,
+              fontSize: '0.67rem',
+              fontWeight: 850,
+              letterSpacing: '0.05em'
+            }}
+          >
+            SCENARIO TESTING
           </div>
 
-          {/* Model Status Pill */}
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 10,
-            padding: '8px 12px',
-            fontSize: '0.72rem',
-            textAlign: 'right'
-          }}>
-            <div style={{ color: 'var(--text-muted)' }}>ACTIVE ML ENGINE:</div>
-            <div style={{ color: '#38bdf8', fontWeight: 700 }}>
-              OSHA 2015-2025 Model ({modelStatus?.total_training_records?.toLocaleString() || '105,995'} Cases)
+          <h1
+            style={{
+              margin: 0,
+              color: COLORS.navy,
+              fontSize: 'clamp(1.55rem, 3vw, 2.15rem)',
+              lineHeight: 1.1,
+              letterSpacing: '-0.04em',
+              fontWeight: 900
+            }}
+          >
+            Safety Scenario Simulator
+          </h1>
+
+          <p
+            style={{
+              margin: '8px 0 0',
+              maxWidth: 720,
+              color: COLORS.muted,
+              fontSize: '0.88rem',
+              lineHeight: 1.55
+            }}
+          >
+            Generate realistic workplace safety incidents and
+            feed them through the SIF-Sense AI pipeline to test
+            risk classification, SIF detection and safety rules.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            padding: '9px 12px',
+            background: COLORS.surface,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 12,
+            boxShadow: '0 5px 18px rgba(15,23,42,0.035)'
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: modelStatus
+                ? COLORS.green
+                : COLORS.subtle,
+              boxShadow: modelStatus
+                ? '0 0 0 4px #DCFCE7'
+                : '0 0 0 4px #F1F5F9'
+            }}
+          />
+
+          <div>
+            <div
+              style={{
+                color: COLORS.subtle,
+                fontSize: '0.57rem',
+                fontWeight: 850,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}
+            >
+              AI engine
             </div>
-            <div style={{ color: '#34d399', fontSize: '0.68rem', marginTop: 2 }}>
-              Accuracy: 96.0% • SIF Recall: 97.5%
+
+            <div
+              style={{
+                marginTop: 2,
+                color: COLORS.text,
+                fontSize: '0.7rem',
+                fontWeight: 800
+              }}
+            >
+              {modelStatus
+                ? 'Model connected'
+                : 'Checking model...'}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          CONTROL CENTER
+          ===================================================== */}
+
+      <section
+        style={{
+          background: COLORS.surface,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 20,
+          padding: 18,
+          marginBottom: 18,
+          boxShadow: '0 10px 34px rgba(15,23,42,0.055)'
+        }}
+      >
+        {/* Control header */}
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 15,
+            flexWrap: 'wrap',
+            paddingBottom: 15,
+            borderBottom: `1px solid #EEF2F6`
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 11
+            }}
+          >
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                flexShrink: 0,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: 12,
+                background: COLORS.indigoSoft,
+                border: `1px solid ${COLORS.indigoBorder}`,
+                color: COLORS.indigo,
+                fontSize: '0.7rem',
+                fontWeight: 900
+              }}
+            >
+              SIM
+            </div>
+
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  flexWrap: 'wrap'
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    color: COLORS.navy,
+                    fontSize: '0.98rem',
+                    fontWeight: 850
+                  }}
+                >
+                  Incident stream controls
+                </h2>
+
+                <span
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    background: streamActive
+                      ? COLORS.greenSoft
+                      : COLORS.background,
+                    border: `1px solid ${
+                      streamActive
+                        ? COLORS.greenBorder
+                        : COLORS.border
+                    }`,
+                    color: streamActive
+                      ? COLORS.green
+                      : COLORS.muted,
+                    fontSize: '0.6rem',
+                    fontWeight: 850,
+                    letterSpacing: '0.03em'
+                  }}
+                >
+                  {streamActive
+                    ? 'LIVE STREAM RUNNING'
+                    : 'STREAM PAUSED'}
+                </span>
+              </div>
+
+              <p
+                style={{
+                  margin: '5px 0 0',
+                  color: COLORS.muted,
+                  fontSize: '0.7rem',
+                  lineHeight: 1.45
+                }}
+              >
+                Generate one event at a time or continuously
+                stream randomized incidents into the safety
+                analysis pipeline.
+              </p>
+            </div>
+          </div>
+
+          {/* Model information */}
+
+          <div
+            style={{
+              minWidth: 240,
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: COLORS.background,
+              border: `1px solid ${COLORS.border}`
+            }}
+          >
+            <div
+              style={{
+                color: COLORS.subtle,
+                fontSize: '0.57rem',
+                fontWeight: 850,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}
+            >
+              Active ML engine
+            </div>
+
+            <div
+              style={{
+                marginTop: 4,
+                color: COLORS.text,
+                fontSize: '0.69rem',
+                fontWeight: 800
+              }}
+            >
+              OSHA 2015–2025 model
+            </div>
+
+            <div
+              style={{
+                marginTop: 3,
+                color: COLORS.muted,
+                fontSize: '0.62rem'
+              }}
+            >
+              {formatNumber(trainingRecords)} training cases
+            </div>
+
+            <div
+              style={{
+                marginTop: 5,
+                color: COLORS.green,
+                fontSize: '0.61rem',
+                fontWeight: 750
+              }}
+            >
+              Accuracy 96.0% · SIF recall 97.5%
             </div>
           </div>
         </div>
 
-        {/* Stream Controls */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 12,
-          paddingTop: 12,
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)'
-        }}>
-          {/* Main Action Buttons */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Main controls */}
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 15,
+            flexWrap: 'wrap',
+            paddingTop: 15
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              gap: 7,
+              flexWrap: 'wrap'
+            }}
+          >
             <button
-              className={`btn ${streamActive ? 'btn-secondary' : 'btn-primary'}`}
-              onClick={() => setStreamActive(prev => !prev)}
+              type="button"
+              onClick={toggleStream}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '9px 18px',
-                fontWeight: 700,
-                fontSize: '0.85rem'
+                ...primaryButton,
+                background: streamActive
+                  ? COLORS.red
+                  : COLORS.blue,
+                boxShadow: streamActive
+                  ? '0 6px 16px rgba(220,38,38,0.18)'
+                  : '0 6px 16px rgba(37,99,235,0.18)'
               }}
             >
-              {streamActive ? '⏸ Pause Live Stream' : '▶ Start Live Stream Feed'}
+              {streamActive
+                ? 'Pause Live Stream'
+                : 'Start Live Stream'}
             </button>
 
             <button
-              className="btn btn-secondary"
+              type="button"
               onClick={feedNextIncident}
               disabled={loadingStep || streamActive}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '9px 14px',
-                fontSize: '0.85rem'
+                ...secondaryButton,
+                opacity:
+                  loadingStep || streamActive ? 0.55 : 1,
+                cursor:
+                  loadingStep || streamActive
+                    ? 'not-allowed'
+                    : 'pointer'
               }}
             >
-              {loadingStep ? '⚡ Feeding...' : '🎲 Single Step (Feed 1)'}
+              {loadingStep
+                ? 'Generating...'
+                : 'Single Step'}
             </button>
 
             {incidents.length > 0 && (
               <button
-                className="btn btn-ghost btn-sm"
+                type="button"
                 onClick={clearFeed}
-                style={{ border: '1px solid var(--border)', padding: '0 12px' }}
+                style={{
+                  ...secondaryButton,
+                  color: COLORS.red,
+                  borderColor: COLORS.redBorder,
+                  background: COLORS.redSoft
+                }}
               >
                 Clear Feed
               </button>
             )}
           </div>
 
-          {/* Configuration Options */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* Speed Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <span>Interval:</span>
-              {[2, 4, 6].map(sec => (
-                <button
-                  key={sec}
-                  onClick={() => setIntervalSec(sec)}
-                  style={{
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    border: '1px solid',
-                    borderColor: intervalSec === sec ? '#6366f1' : 'rgba(255,255,255,0.1)',
-                    background: intervalSec === sec ? 'rgba(99,102,241,0.3)' : 'transparent',
-                    color: intervalSec === sec ? '#fff' : '#94a3b8',
-                    fontSize: '0.7rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {sec}s
-                </button>
-              ))}
-            </div>
+          {/* Speed */}
 
-            {/* Severity Filter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <span>Category:</span>
-              <select
-                value={severityFilter}
-                onChange={e => setSeverityFilter(e.target.value)}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              flexWrap: 'wrap'
+            }}
+          >
+            <span
+              style={{
+                color: COLORS.muted,
+                fontSize: '0.67rem',
+                fontWeight: 750
+              }}
+            >
+              Stream interval
+            </span>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: 4,
+                padding: 3,
+                borderRadius: 9,
+                background: COLORS.background,
+                border: `1px solid ${COLORS.border}`
+              }}
+            >
+              {INTERVAL_OPTIONS.map((seconds) => {
+                const selected =
+                  intervalSec === seconds;
+
+                return (
+                  <button
+                    key={seconds}
+                    type="button"
+                    onClick={() =>
+                      setIntervalSec(seconds)
+                    }
+                    style={{
+                      minWidth: 39,
+                      height: 28,
+                      border: 'none',
+                      borderRadius: 7,
+                      background: selected
+                        ? COLORS.surface
+                        : 'transparent',
+                      color: selected
+                        ? COLORS.blue
+                        : COLORS.muted,
+                      boxShadow: selected
+                        ? '0 2px 7px rgba(15,23,42,0.08)'
+                        : 'none',
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {seconds}s
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Severity selector */}
+
+        <div
+          style={{
+            marginTop: 15,
+            paddingTop: 15,
+            borderTop: `1px solid #EEF2F6`
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+              marginBottom: 8
+            }}
+          >
+            <div>
+              <div
                 style={{
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  border: '1px solid var(--border-color)',
-                  color: '#fff',
-                  borderRadius: 6,
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  outline: 'none'
+                  color: COLORS.text,
+                  fontSize: '0.72rem',
+                  fontWeight: 850
                 }}
               >
-                <option value="ANY">Random (All Types)</option>
-                <option value="CRITICAL_SIF">Critical SIF Precursor</option>
-                <option value="HIGH_RISK_NEAR_MISS">High-Potential Near Miss</option>
-                <option value="MEDIUM_PRECURSOR">Medium Operational Risk</option>
-                <option value="LOW_OBSERVATION">Low Risk / Observation</option>
-              </select>
+                Scenario category
+              </div>
+
+              <div
+                style={{
+                  marginTop: 2,
+                  color: COLORS.subtle,
+                  fontSize: '0.62rem'
+                }}
+              >
+                Choose the type of incident the generator
+                should prioritize.
+              </div>
+            </div>
+
+            <span
+              style={{
+                padding: '4px 8px',
+                borderRadius: 7,
+                background: COLORS.background,
+                border: `1px solid ${COLORS.border}`,
+                color: COLORS.muted,
+                fontSize: '0.61rem',
+                fontWeight: 700
+              }}
+            >
+              Current:{' '}
+              {
+                SEVERITY_OPTIONS.find(
+                  (option) =>
+                    option.id === severityFilter
+                )?.shortLabel
+              }
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit, minmax(145px, 1fr))',
+              gap: 7
+            }}
+          >
+            {SEVERITY_OPTIONS.map((option) => {
+              const selected =
+                severityFilter === option.id;
+
+              const isCritical =
+                option.id === 'CRITICAL_SIF';
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() =>
+                    setSeverityFilter(option.id)
+                  }
+                  style={{
+                    minHeight: 54,
+                    padding: '9px 10px',
+                    textAlign: 'left',
+                    borderRadius: 10,
+                    border: `1px solid ${
+                      selected
+                        ? isCritical
+                          ? COLORS.redBorder
+                          : COLORS.indigoBorder
+                        : COLORS.border
+                    }`,
+                    background: selected
+                      ? isCritical
+                        ? COLORS.redSoft
+                        : COLORS.indigoSoft
+                      : COLORS.surface,
+                    color: selected
+                      ? isCritical
+                        ? COLORS.red
+                        : COLORS.indigo
+                      : COLORS.text,
+                    cursor: 'pointer',
+                    transition:
+                      'all .18s ease'
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '0.69rem',
+                      fontWeight: 850
+                    }}
+                  >
+                    {option.label}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 3,
+                      color: selected
+                        ? isCritical
+                          ? '#B91C1C'
+                          : COLORS.indigo
+                        : COLORS.subtle,
+                      fontSize: '0.6rem',
+                      lineHeight: 1.3
+                    }}
+                  >
+                    {option.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          ERROR
+          ===================================================== */}
+
+      {streamError && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            marginBottom: 16,
+            padding: '12px 14px',
+            borderRadius: 13,
+            background: COLORS.redSoft,
+            border: `1px solid ${COLORS.redBorder}`,
+            color: '#B91C1C',
+            fontSize: '0.72rem',
+            lineHeight: 1.45
+          }}
+        >
+          <div
+            style={{
+              width: 23,
+              height: 23,
+              flexShrink: 0,
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: 7,
+              background: '#FEE2E2',
+              fontWeight: 900
+            }}
+          >
+            !
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <strong>Simulator connection issue</strong>
+            <div style={{ marginTop: 2 }}>
+              {streamError}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Telemetry Counter Strip */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 12,
-        marginBottom: '1.25rem'
-      }}>
-        <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #6366f1' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            Total Generated & Fed
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f8fafc', marginTop: 4 }}>
-            {stats.total}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
-            Real-time unique procedural events
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #ef4444' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            Critical SIF Ratio
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ef4444', marginTop: 4 }}>
-            {sifRatio}% <span style={{ fontSize: '0.85rem', color: '#fca5a5' }}>({stats.sifCount} cases)</span>
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
-            Flagged for immediate work stoppage
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #10b981' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            AI Inference Latency
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>
-            ~{stats.avgLatency} ms
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
-            Sub-millisecond TF-IDF vectorization
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #f59e0b' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-            IOGP Rules Triggered
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
-            {incidents.filter(i => i.risk?.iogp_rule && !i.risk.iogp_rule.includes('General')).length}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
-            Life-Saving Rule mitigations assigned
-          </div>
-        </div>
-      </div>
-
-      {/* Incident Stream Timeline Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f1f5f9', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>⚡ Live Simulated Safety Stream</span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-            (showing latest {incidents.length} events)
-          </span>
-        </h3>
-        {streamActive && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: '#34d399' }}>
-            <span className="spinner" style={{ width: 12, height: 12 }} />
-            Streaming new event every {intervalSec}s...
-          </div>
-        )}
-      </div>
-
-      {/* Empty State */}
-      {incidents.length === 0 && (
-        <div className="card" style={{
-          padding: '3.5rem 1.5rem',
-          textAlign: 'center',
-          background: 'rgba(15, 23, 42, 0.4)',
-          border: '1px dashed var(--border-color)',
-          borderRadius: 14
-        }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎮</div>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: '#f1f5f9' }}>
-            Simulator Ready
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 16px 0', maxWidth: 460, marginInline: 'auto' }}>
-            Click <strong>"Start Live Stream Feed"</strong> to continuously stream randomized safety incidents with dynamic dates, sites, and AI analysis, or click <strong>"Single Step"</strong> to generate one.
-          </p>
           <button
-            className="btn btn-primary"
-            onClick={feedNextIncident}
-            style={{ padding: '10px 20px', fontWeight: 700 }}
+            type="button"
+            onClick={() => setStreamError('')}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: '#B91C1C',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 800
+            }}
           >
-            🎲 Generate First Simulated Incident
+            ×
           </button>
         </div>
       )}
 
-      {/* Incidents Stream Feed List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <AnimatePresence>
-          {incidents.map((inc) => {
-            const isSif = inc.classification?.sif_potential;
-            const score = inc.risk?.risk_score || inc.risk?.score || 0;
-            const level = inc.risk?.risk_level || inc.risk?.level || 'LOW';
-            const sim = inc.simulation || {};
+      {/* =====================================================
+          TELEMETRY
+          ===================================================== */}
 
-            const levelColors = {
-              CRITICAL: '#ef4444',
-              HIGH: '#f97316',
-              MEDIUM: '#eab308',
-              LOW: '#10b981'
-            };
-            const themeColor = levelColors[level] || '#6366f1';
+      <section
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(190px, 1fr))',
+          gap: 12,
+          marginBottom: 23
+        }}
+      >
+        <StatCard
+          label="Events Generated"
+          value={stats.total}
+          helper="Incidents generated during this session"
+          color={COLORS.blue}
+          soft={COLORS.blueSoft}
+          icon="01"
+        />
 
-            return (
-              <motion.div
-                key={inc.report_id || sim.uuid || Math.random()}
-                initial={{ opacity: 0, y: -16, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-                className="card"
+        <StatCard
+          label="SIF Ratio"
+          value={`${sifRatio}%`}
+          helper={`${stats.sifCount} simulated SIF-potential events`}
+          color={COLORS.red}
+          soft={COLORS.redSoft}
+          icon="SIF"
+        />
+
+        <StatCard
+          label="AI Latency"
+          value={`~${stats.avgLatency} ms`}
+          helper="Measured client-side round-trip latency"
+          color={COLORS.green}
+          soft={COLORS.greenSoft}
+          icon="MS"
+        />
+
+        <StatCard
+          label="Safety Rules"
+          value={iogpCount}
+          helper="IOGP rule mitigations triggered in visible feed"
+          color={COLORS.orange}
+          soft={COLORS.orangeSoft}
+          icon="R"
+        />
+      </section>
+
+      {/* =====================================================
+          LIVE STREAM HEADER
+          ===================================================== */}
+
+      <section>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 11
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap'
+              }}
+            >
+              <h2
                 style={{
-                  padding: '1.1rem 1.25rem',
-                  borderLeft: `4px solid ${themeColor}`,
-                  background: isSif
-                    ? 'linear-gradient(90deg, rgba(239, 68, 68, 0.05) 0%, rgba(30, 41, 59, 0.5) 100%)'
-                    : 'rgba(30, 41, 59, 0.45)',
-                  boxShadow: isSif ? '0 4px 20px rgba(239, 68, 68, 0.12)' : 'none'
+                  margin: 0,
+                  color: COLORS.navy,
+                  fontSize: '1.05rem',
+                  fontWeight: 850,
+                  letterSpacing: '-0.02em'
                 }}
               >
-                {/* Top Meta Bar */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  marginBottom: 10
-                }}>
-                  {/* Left: Date, Site, Shift */}
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: '0.74rem' }}>
-                    <span style={{
-                      background: 'rgba(56, 189, 248, 0.15)',
-                      border: '1px solid rgba(56, 189, 248, 0.3)',
-                      color: '#38bdf8',
-                      padding: '2px 8px',
-                      borderRadius: 6,
-                      fontWeight: 700
-                    }}>
-                      📅 {sim.event_date || 'Live Incident'}
-                    </span>
-                    <span style={{ color: '#e2e8f0', fontWeight: 600 }}>
-                      🏭 {sim.site || inc.nlp?.location || 'Operational Facility'}
-                    </span>
-                    <span style={{ color: '#94a3b8' }}>
-                      ⏱️ {sim.shift}
-                    </span>
-                    {sim.industry && (
-                      <span style={{ color: '#a78bfa', fontSize: '0.7rem' }}>
-                        • {sim.industry}
-                      </span>
-                    )}
-                  </div>
+                Live simulated safety stream
+              </h2>
 
-                  {/* Right: Risk Badge & Score Meter */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      padding: '3px 10px',
-                      borderRadius: 20,
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      background: `${themeColor}22`,
-                      border: `1px solid ${themeColor}66`,
-                      color: themeColor
-                    }}>
-                      {level} RISK ({score}/100)
-                    </span>
-                    <button
-                      onClick={() => handleInspectInAnalyzer(inc)}
-                      className="btn btn-ghost btn-sm"
-                      style={{
-                        fontSize: '0.7rem',
-                        padding: '3px 8px',
-                        border: '1px solid var(--border)',
-                        color: '#93c5fd'
-                      }}
-                      title="Inspect full graph and NLP entities in Analyzer"
-                    >
-                      Inspect in Analyzer ↗
-                    </button>
-                  </div>
-                </div>
+              <span
+                style={{
+                  padding: '4px 7px',
+                  borderRadius: 999,
+                  background: COLORS.background,
+                  border: `1px solid ${COLORS.border}`,
+                  color: COLORS.muted,
+                  fontSize: '0.59rem',
+                  fontWeight: 750
+                }}
+              >
+                Latest {incidents.length} of 25
+              </span>
+            </div>
 
-                {/* Narrative Text */}
-                <div style={{
-                  fontSize: '0.88rem',
-                  lineHeight: 1.5,
-                  color: '#f8fafc',
-                  marginBottom: 10,
-                  background: 'rgba(0, 0, 0, 0.25)',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,0.04)'
-                }}>
-                  {sim.narrative || inc.preprocessing?.original}
-                </div>
+            <p
+              style={{
+                margin: '4px 0 0',
+                color: COLORS.subtle,
+                fontSize: '0.67rem'
+              }}
+            >
+              Each event is generated and analyzed through
+              the configured safety pipeline.
+            </p>
+          </div>
 
-                {/* Bottom Intelligence Badges */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  fontSize: '0.72rem',
-                  paddingTop: 8,
-                  borderTop: '1px solid rgba(255,255,255,0.06)'
-                }}>
-                  {/* Left: ML model probability & trauma nature */}
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      ⚡ OSHA ML: <strong>{((inc.classification?.model_score || 0) * 100).toFixed(1)}% SIF Prob</strong>
-                    </span>
-                    {inc.classification?.predicted_nature && (
-                      <span style={{ color: '#cbd5e1' }}>
-                        🩺 Trauma: <strong style={{ color: '#fff' }}>{inc.classification.predicted_nature}</strong>
-                      </span>
-                    )}
-                    {inc.risk?.iogp_rule && (
-                      <span style={{ color: '#93c5fd' }}>
-                        🛡️ {inc.risk.iogp_rule}
-                      </span>
-                    )}
-                  </div>
+          {streamActive && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '6px 9px',
+                borderRadius: 9,
+                background: COLORS.greenSoft,
+                border: `1px solid ${COLORS.greenBorder}`,
+                color: COLORS.green,
+                fontSize: '0.64rem',
+                fontWeight: 800
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: COLORS.green,
+                  animation:
+                    'sifSimulatorPulse 1.2s ease-in-out infinite'
+                }}
+              />
 
-                  {/* Right: Trigger words tokens */}
-                  {inc.classification?.risk_tokens && inc.classification.risk_tokens.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>Triggers:</span>
-                      {inc.classification.risk_tokens.slice(0, 3).map((tok, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            background: tok.weight > 10 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.15)',
-                            color: tok.weight > 10 ? '#fca5a5' : '#fde68a',
-                            padding: '1px 5px',
-                            borderRadius: 4,
-                            fontSize: '0.66rem',
-                            fontWeight: 600
-                          }}
-                        >
-                          {tok.word} +{tok.weight}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+              New event every {intervalSec}s
+            </div>
+          )}
+        </div>
+
+        <style>
+          {`
+            @keyframes sifSimulatorPulse {
+              0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+              }
+              50% {
+                opacity: .45;
+                transform: scale(.8);
+              }
+            }
+
+            @keyframes sifSimulatorSpin {
+              to {
+                transform: rotate(360deg);
+              }
+            }
+          `}
+        </style>
+
+        {/* ===================================================
+            EMPTY STATE
+            =================================================== */}
+
+        {incidents.length === 0 && (
+          <div
+            style={{
+              background: COLORS.surface,
+              border: `1px dashed ${COLORS.borderStrong}`,
+              borderRadius: 19,
+              padding: '4rem 1.5rem',
+              textAlign: 'center',
+              boxShadow:
+                '0 7px 25px rgba(15,23,42,0.025)'
+            }}
+          >
+            <div
+              style={{
+                width: 58,
+                height: 58,
+                margin: '0 auto 15px',
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: 17,
+                background: COLORS.indigoSoft,
+                border: `1px solid ${COLORS.indigoBorder}`,
+                color: COLORS.indigo,
+                fontSize: '0.8rem',
+                fontWeight: 900
+              }}
+            >
+              SIM
+            </div>
+
+            <h3
+              style={{
+                margin: 0,
+                color: COLORS.navy,
+                fontSize: '1rem',
+                fontWeight: 850
+              }}
+            >
+              Simulator ready
+            </h3>
+
+            <p
+              style={{
+                maxWidth: 500,
+                margin: '7px auto 17px',
+                color: COLORS.muted,
+                fontSize: '0.75rem',
+                lineHeight: 1.55
+              }}
+            >
+              Start the live stream to continuously generate
+              randomized workplace incidents, or use Single
+              Step to create one event for inspection.
+            </p>
+
+            <button
+              type="button"
+              onClick={feedNextIncident}
+              disabled={loadingStep}
+              style={{
+                ...primaryButton,
+                opacity: loadingStep ? 0.6 : 1
+              }}
+            >
+              {loadingStep
+                ? 'Generating first incident...'
+                : 'Generate First Incident'}
+            </button>
+          </div>
+        )}
+
+        {/* ===================================================
+            INCIDENT LIST
+            =================================================== */}
+
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 11
+          }}
+        >
+          <AnimatePresence initial={false}>
+            {incidents.map((incident, index) => (
+              <IncidentCard
+                key={getIncidentKey(incident, index)}
+                incident={incident}
+                onInspect={() =>
+                  handleInspectInAnalyzer(incident)
+                }
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* =========================================================
+   INCIDENT CARD
+   ========================================================= */
+
+function IncidentCard({
+  incident,
+  onInspect
+}) {
+  const sif = Boolean(
+    incident?.classification?.sif_potential
+  );
+
+  const score = getScore(incident);
+  const level = getLevel(incident);
+  const risk = getRiskConfig(level);
+  const simulation = incident?.simulation || {};
+
+  const modelScore =
+    incident?.classification?.model_score;
+
+  const predictedNature =
+    incident?.classification?.predicted_nature;
+
+  const iogpRule =
+    incident?.risk?.iogp_rule;
+
+  const location =
+    simulation?.site ||
+    incident?.nlp?.location ||
+    'Operational Facility';
+
+  const shift =
+    simulation?.shift || '';
+
+  const industry =
+    simulation?.industry || '';
+
+  const eventDate =
+    simulation?.event_date ||
+    '';
+
+  const activity =
+    incident?.nlp?.activity ||
+    '';
+
+  const hazard =
+    incident?.nlp?.hazard ||
+    '';
+
+  const barrier =
+    incident?.nlp?.barrier_failure ||
+    '';
+
+  const receivedAt =
+    incident?.receivedAt ||
+    '';
+
+  const clientLatency =
+    incident?.clientLatency;
+
+  return (
+    <motion.article
+      layout
+      initial={{
+        opacity: 0,
+        y: -12,
+        scale: 0.985
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        scale: 1
+      }}
+      exit={{
+        opacity: 0,
+        scale: 0.97
+      }}
+      transition={{
+        duration: 0.24
+      }}
+      style={{
+        background: COLORS.surface,
+        border: `1px solid ${COLORS.border}`,
+        borderLeft: `4px solid ${risk.color}`,
+        borderRadius: 17,
+        padding: '15px 17px',
+        boxShadow: sif
+          ? '0 9px 28px rgba(220,38,38,0.075)'
+          : '0 6px 22px rgba(15,23,42,0.035)'
+      }}
+    >
+      {/* Top row */}
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginBottom: 11
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 6
+          }}
+        >
+          {eventDate && (
+            <MetaChip
+              label="Date"
+              value={eventDate}
+              tone="blue"
+            />
+          )}
+
+          <MetaChip
+            label="Site"
+            value={location}
+          />
+
+          {shift && (
+            <MetaChip
+              label="Shift"
+              value={shift}
+            />
+          )}
+
+          {industry && (
+            <MetaChip
+              value={industry}
+            />
+          )}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            flexWrap: 'wrap'
+          }}
+        >
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '5px 9px',
+              borderRadius: 999,
+              background: risk.soft,
+              border: `1px solid ${risk.border}`,
+              color: risk.color,
+              fontSize: '0.65rem',
+              fontWeight: 850
+            }}
+          >
+            {risk.label} Risk
+            <span style={{ opacity: 0.65 }}>
+              {score}/100
+            </span>
+          </span>
+
+          {sif && (
+            <span
+              style={{
+                padding: '5px 9px',
+                borderRadius: 999,
+                background: COLORS.redSoft,
+                border: `1px solid ${COLORS.redBorder}`,
+                color: COLORS.red,
+                fontSize: '0.64rem',
+                fontWeight: 850
+              }}
+            >
+              SIF Potential
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={onInspect}
+            style={{
+              height: 30,
+              padding: '0 9px',
+              borderRadius: 8,
+              border: `1px solid ${COLORS.blueBorder}`,
+              background: COLORS.blueSoft,
+              color: COLORS.blue,
+              fontSize: '0.62rem',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            Inspect in Analyzer →
+          </button>
+        </div>
+      </div>
+
+      {/* Narrative */}
+
+      <div
+        style={{
+          padding: '12px 13px',
+          borderRadius: 12,
+          background: COLORS.background,
+          border: `1px solid ${COLORS.border}`,
+          color: COLORS.text,
+          fontSize: '0.79rem',
+          lineHeight: 1.58,
+          marginBottom: 11
+        }}
+      >
+        {getIncidentNarrative(incident)}
+      </div>
+
+      {/* Extracted safety intelligence */}
+
+      {(activity || hazard || barrier) && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: 7,
+            marginBottom: 11
+          }}
+        >
+          {activity && (
+            <IntelligenceField
+              label="Activity"
+              value={activity}
+            />
+          )}
+
+          {hazard && (
+            <IntelligenceField
+              label="Hazard"
+              value={hazard}
+              danger
+            />
+          )}
+
+          {barrier && (
+            <IntelligenceField
+              label="Barrier Failure"
+              value={barrier}
+              danger
+            />
+          )}
+        </div>
+      )}
+
+      {/* Intelligence footer */}
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+          paddingTop: 10,
+          borderTop: `1px solid #EEF2F6`
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexWrap: 'wrap'
+          }}
+        >
+          {modelScore !== undefined &&
+            modelScore !== null && (
+              <MetaChip
+                label="OSHA ML"
+                value={`${formatProbability(
+                  modelScore
+                )} SIF probability`}
+                tone="blue"
+              />
+            )}
+
+          {predictedNature && (
+            <MetaChip
+              label="Predicted injury"
+              value={predictedNature}
+            />
+          )}
+
+          {iogpRule && (
+            <MetaChip
+              label="Safety rule"
+              value={iogpRule}
+              tone="orange"
+            />
+          )}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            color: COLORS.subtle,
+            fontSize: '0.61rem',
+            fontWeight: 650
+          }}
+        >
+          {receivedAt && (
+            <span>
+              Received {receivedAt}
+            </span>
+          )}
+
+          {clientLatency !== undefined && (
+            <span>
+              {clientLatency} ms
+            </span>
+          )}
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+/* =========================================================
+   INTELLIGENCE FIELD
+   ========================================================= */
+
+function IntelligenceField({
+  label,
+  value,
+  danger = false
+}) {
+  return (
+    <div
+      style={{
+        minWidth: 0,
+        padding: '9px 10px',
+        borderRadius: 10,
+        background: danger
+          ? COLORS.redSoft
+          : COLORS.background,
+        border: `1px solid ${
+          danger
+            ? COLORS.redBorder
+            : COLORS.border
+        }`
+      }}
+    >
+      <div
+        style={{
+          color: COLORS.subtle,
+          fontSize: '0.57rem',
+          fontWeight: 850,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em'
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          marginTop: 4,
+          color: danger
+            ? '#B91C1C'
+            : COLORS.text,
+          fontSize: '0.68rem',
+          lineHeight: 1.35,
+          fontWeight: 750,
+          overflowWrap: 'anywhere'
+        }}
+      >
+        {value}
       </div>
     </div>
   );
 }
+
+/* =========================================================
+   BUTTON STYLES
+   ========================================================= */
+
+const primaryButton = {
+  minHeight: 40,
+  padding: '0 15px',
+  border: 'none',
+  borderRadius: 10,
+  background: COLORS.blue,
+  color: '#FFFFFF',
+  fontSize: '0.73rem',
+  fontWeight: 800,
+  cursor: 'pointer',
+  boxShadow: '0 6px 16px rgba(37,99,235,0.18)'
+};
+
+const secondaryButton = {
+  minHeight: 40,
+  padding: '0 14px',
+  border: `1px solid ${COLORS.borderStrong}`,
+  borderRadius: 10,
+  background: COLORS.surface,
+  color: COLORS.text,
+  fontSize: '0.73rem',
+  fontWeight: 750,
+  cursor: 'pointer',
+  boxShadow: '0 4px 12px rgba(15,23,42,0.035)'
+};
