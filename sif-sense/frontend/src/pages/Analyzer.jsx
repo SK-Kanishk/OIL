@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { analyzeReport, getOshaSamples } from '../services/api';
+import { analyzeReport, getOshaSamples, generateSimulatedIncident, feedSimulatedIncident } from '../services/api';
 import PrecursorGraph from '../components/PrecursorGraph';
 
 const PIPELINE_STEPS = [
@@ -47,7 +48,8 @@ function ScoreRing({ score, level }) {
 }
 
 export default function Analyzer({ onNewAlert }) {
-  const [reportText, setReportText] = useState('');
+  const location = useLocation();
+  const [reportText, setReportText] = useState(location.state?.preloadedText || '');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -55,6 +57,35 @@ export default function Analyzer({ onNewAlert }) {
   const [activeTab, setActiveTab] = useState('input'); // 'input' | 'result'
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [simulatedMeta, setSimulatedMeta] = useState(null);
+  const [simulating, setSimulating] = useState(false);
+  const [simSeverity, setSimSeverity] = useState('ANY');
+
+  const handleSimulate = async (autoFeed = false) => {
+    try {
+      setSimulating(true);
+      setError(null);
+      if (autoFeed) {
+        setLoading(true);
+        const res = await feedSimulatedIncident(simSeverity);
+        setSimulatedMeta(res.data.simulation);
+        setReportText(res.data.simulation.narrative);
+        setResult(res.data);
+        setActiveTab('result');
+        if (res.data.risk?.score >= 80 && onNewAlert) onNewAlert();
+      } else {
+        const res = await generateSimulatedIncident(simSeverity);
+        setSimulatedMeta(res.data);
+        setReportText(res.data.narrative);
+        setResult(null);
+      }
+    } catch (err) {
+      setError('Failed to contact simulator service.');
+    } finally {
+      setSimulating(false);
+      setLoading(false);
+    }
+  };
 
   // Load benchmark OSHA samples
   useEffect(() => {
@@ -85,6 +116,13 @@ export default function Analyzer({ onNewAlert }) {
       setLoading(false);
     }
   }, [reportText, onNewAlert]);
+
+  useEffect(() => {
+    if (location.state?.preloadedText) {
+      setReportText(location.state.preloadedText);
+      runAnalysis(location.state.preloadedText);
+    }
+  }, [location.state, runAnalysis]);
 
   const handleCopySummary = () => {
     if (!result) return;
@@ -166,6 +204,144 @@ Required Action: ${result.risk?.ai_recommendation}`;
             className="card"
             style={{ padding: '1.25rem', marginBottom: '0.5rem' }}
           >
+            {/* Dynamic Procedural Simulator Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              borderRadius: 10,
+              padding: '10px 12px',
+              marginBottom: 12
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: '1rem' }}>🎲</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#c7d2fe', letterSpacing: '0.03em' }}>
+                    DYNAMIC INCIDENT SIMULATOR
+                  </span>
+                  <span style={{ fontSize: '0.68rem', background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                    NEW DATA EVERY TIME
+                  </span>
+                </div>
+                
+                {/* Severity selector */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[
+                    { id: 'ANY', label: 'Random' },
+                    { id: 'CRITICAL_SIF', label: 'Critical SIF' },
+                    { id: 'HIGH_RISK_NEAR_MISS', label: 'Near Miss' },
+                    { id: 'LOW_OBSERVATION', label: 'Low Risk' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSimSeverity(tab.id)}
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '0.68rem',
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: '1px solid',
+                        borderColor: simSeverity === tab.id ? '#6366f1' : 'rgba(255,255,255,0.1)',
+                        background: simSeverity === tab.id ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.03)',
+                        color: simSeverity === tab.id ? '#fff' : '#94a3b8',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Simulator Action Buttons */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => handleSimulate(false)}
+                  disabled={simulating || loading}
+                  style={{
+                    flex: 1,
+                    minWidth: 150,
+                    padding: '6px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    borderRadius: 8,
+                    border: '1px solid rgba(129, 140, 248, 0.4)',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    color: '#e0e7ff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {simulating ? 'Generating...' : '🎲 Generate Random Scenario'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSimulate(true)}
+                  disabled={simulating || loading}
+                  style={{
+                    flex: 1,
+                    minWidth: 160,
+                    padding: '6px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    borderRadius: 8,
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    boxShadow: '0 2px 8px rgba(79, 70, 229, 0.4)'
+                  }}
+                >
+                  ⚡ Auto-Feed & Analyze Now
+                </button>
+              </div>
+
+              {/* Dynamic Metadata Strip (Date, Site, Shift, Category) */}
+              {simulatedMeta && (
+                <div style={{
+                  marginTop: 8,
+                  padding: '6px 10px',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                  fontSize: '0.7rem',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: '#38bdf8', fontWeight: 600 }}>
+                    📅 {simulatedMeta.event_date}
+                  </span>
+                  <span style={{ color: '#cbd5e1' }}>
+                    🏭 <strong>{simulatedMeta.site}</strong>
+                  </span>
+                  <span style={{ color: '#a78bfa' }}>
+                    ⏱️ {simulatedMeta.shift?.split(' ')[0]} Shift
+                  </span>
+                  <span style={{
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    background: simulatedMeta.expected_sif ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    color: simulatedMeta.expected_sif ? '#fca5a5' : '#6ee7b7'
+                  }}>
+                    {simulatedMeta.category}
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f1f5f9' }}>
                 Safety Incident / Observation Text

@@ -201,21 +201,71 @@ def classify(text: str, nlp_result: dict) -> dict:
             # Extract top contributing words instantaneously
             risk_tokens = extract_risk_tokens(text, bundle)
 
-            # Safety guardrail check: if text mentions unmistakable life-threatening conditions
             text_low = text.lower()
-            if any(term in text_low for term in ["amputat", "loss of eye", "crushed between", "electrocution", "fatal"]):
+
+            # ── SIF GUARDRAIL BOOSTS: Life-threatening conditions the model may miss ──
+            # H2S / Confined Space / Toxic Gas: model vocabulary doesn't capture well
+            confined_space_sif = (
+                ("confined space" in text_low or "storage tank" in text_low or "manhole" in text_low)
+                and any(t in text_low for t in ["gas", "h2s", "oxygen", "asphyx", "dizziness", "fume"])
+            )
+            # Trenching / Collapse / Burial
+            trench_sif = (
+                any(t in text_low for t in ["trench", "excavation", "cave-in"])
+                and any(t in text_low for t in ["collapse", "buried", "burial", "asphyx", "wall fail"])
+            )
+            # Suspended load drop / Rigger struck
+            crane_drop_sif = (
+                any(t in text_low for t in ["suspended load", "crane lift", "sling failed", "sling failure", "rigging sling", "rigger"])
+                and any(t in text_low for t in ["drop", "fell", "struck", "pinned", "crushed"])
+            )
+
+            if confined_space_sif or trench_sif or crane_drop_sif:
+                if sif_prob < 0.70:
+                    sif_prob = max(sif_prob, 0.82)
+                    is_sif = True
+                    confidence = 0.90
+                    if confined_space_sif and predicted_nature not in ["Amputation", "Fracture", "Crushing Injury"]:
+                        predicted_nature = "Toxic Gas / Asphyxiation Trauma"
+                    elif trench_sif:
+                        predicted_nature = "Traumatic Asphyxia / Crush"
+
+            # Safety guardrail boost: unmistakable life-threatening outcome terms
+            if any(term in text_low for term in ["amputat", "loss of eye", "crushed between", "electrocution", "fatal", "fatality"]):
                 if sif_prob < 0.65:
                     sif_prob = max(sif_prob, 0.88)
                     is_sif = True
                     confidence = 0.95
 
-            # Non-SIF check: if clearly minor office / paperwork
-            if any(term in text_low for term in ["minor paper cut", "empty cardboard", "parking pass", "meeting room"]):
+            # ── NON-SIF GUARDRAILS: Clearly minor administrative / first-aid events ──
+            # Expand list significantly to avoid false positives
+            non_sif_terms = [
+                "minor paper cut", "empty cardboard", "parking pass", "meeting room",
+                "coffee spill", "coffee spilled", "breakroom", "canteen", "lunch break",
+                "paper cut", "minor scratch", "minor cut", "spilled coffee",
+                "administrative", "office meeting", "staff meeting", "training session",
+                "paperwork error", "documentation", "minor bruise", "ink spill"
+            ]
+            if any(term in text_low for term in non_sif_terms):
                 if sif_prob > 0.40:
-                    sif_prob = min(sif_prob, 0.15)
+                    sif_prob = min(sif_prob, 0.18)
                     is_sif = False
                     confidence = 0.90
-                    predicted_nature = "Minor Cut / Scratch"
+                    predicted_nature = "Minor Event / No Injury"
+
+            # ── BORDERLINE SCORE SOFTENING (0.50–0.58 with no strong SIF evidence) ──
+            # Prevents borderline model scores from triggering false SIF
+            if 0.50 <= sif_prob <= 0.58 and is_sif:
+                strong_evidence = any(w in text_low for w in [
+                    "amputa", "fractur", "crushed", "burn", "electro", "arc flash",
+                    "fall from", "fell from", "scaffold", "confined space", "h2s",
+                    "lockout", "energized", "suspended load", "explosion", "fatal"
+                ])
+                if not strong_evidence:
+                    sif_prob = 0.42
+                    is_sif = False
+                    confidence = 0.58
+                    predicted_nature = "Sprain / Strain / Soft Tissue"
 
             return {
                 "sif_potential": is_sif,

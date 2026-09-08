@@ -6,18 +6,21 @@ import AlertCenter from './pages/AlertCenter';
 import HSEReview from './pages/HSEReview';
 import Reports from './pages/Reports';
 import ModelInsights from './pages/ModelInsights';
+import Simulator from './pages/Simulator';
 import { getAlerts, getDatabaseStatus, updateDatabaseConnection } from './services/api';
 
 const NAV_ITEMS = [
-  { path: '/',         icon: '🧠', label: 'Analyzer',    exact: true },
+  { path: '/',          icon: '🧠', label: 'Analyzer',    exact: true },
+  { path: '/simulator', icon: '🎮', label: 'Simulator' },
   { path: '/dashboard', icon: '📊', label: 'Dashboard' },
-  { path: '/model',    icon: '⚡', label: 'OSHA Model' },
-  { path: '/alerts',   icon: '🚨', label: 'Alerts & Review' },
-  { path: '/reports',  icon: '📄', label: 'Report Log' },
+  { path: '/model',     icon: '⚡', label: 'OSHA Model' },
+  { path: '/alerts',    icon: '🚨', label: 'Alerts & Review' },
+  { path: '/reports',   icon: '📄', label: 'Report Log' },
 ];
 
 const PAGE_META = {
   '/':          { title: 'SIF Analyzer',    sub: 'Real-time incident evaluation powered by OSHA ML model' },
+  '/simulator': { title: 'Incident Simulator', sub: 'Procedural generation & automated streaming feed' },
   '/dashboard': { title: 'Command Center',  sub: 'Live SIF intelligence & precursor hotspot trends' },
   '/model':     { title: 'OSHA AI Telemetry', sub: 'Trained on 105,996 severe workplace injury records' },
   '/alerts':    { title: 'Alerts & Actions', sub: 'Active SIF early warnings & human-in-the-loop review' },
@@ -518,6 +521,7 @@ export default function App() {
 
           <Routes>
             <Route path="/" element={<Analyzer onNewAlert={() => setPendingAlerts(p => p + 1)} />} />
+            <Route path="/simulator" element={<Simulator />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/model" element={<ModelInsights />} />
             <Route path="/alerts" element={<AlertCenter />} />

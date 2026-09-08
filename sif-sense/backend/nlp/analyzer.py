@@ -14,37 +14,47 @@ from ai.preprocessor import preprocess
 ACTIVITY_PATTERNS = {
     "Confined Space Entry": [
         "confined space", "manhole", "tank entry", "vessel entry",
-        "sump", "pit entry", "underground entry", "permit required space"
+        "sump", "pit entry", "underground entry", "permit required space",
+        "storage tank", "sewer entry"
     ],
     "Working at Height": [
         "working at height", "roof work", "scaffold", "ladder", "elevated",
         "aerial platform", "fall from height", "working on top",
-        "mewp", "elevated platform", "high level", "above ground"
+        "mewp", "elevated platform", "high level", "above ground",
+        "beam walk", "structural steel", "roof edge"
+    ],
+    "Machinery / Equipment Operation": [
+        "conveyor", "stamping press", "press brake", "hydraulic press",
+        "roller", "rotating equipment", "lathe", "milling machine",
+        "clearing jam", "clearing jammed", "machine maintenance",
+        "auger", "shredder", "crusher", "gearbox", "nip point",
+        "operating machine", "industrial robot", "packaging line"
     ],
     "Electrical Work": [
-        "electrical", "high voltage", "live wire", "switchboard",
+        "electrical", "high voltage", "live wire", "switchboard", "switchgear",
         "arc flash", "electrical isolation", "energized", "panel work",
-        "lockout tagout", "circuit breaker"
+        "lockout tagout", "circuit breaker", "transformer", "busbar"
     ],
     "Lifting Operations": [
         "lifting", "crane", "rigging", "suspended load", "hoisting",
-        "overhead lift", "forklift", "slinging", "overhead crane"
+        "overhead lift", "forklift", "slinging", "overhead crane",
+        "gantry crane", "winch"
     ],
     "Hot Work": [
         "hot work", "welding", "grinding", "cutting", "sparks",
-        "flame", "open flame", "torch", "soldering"
+        "flame", "open flame", "torch", "soldering", "plasma cutter"
     ],
     "Driving / Vehicle": [
-        "driving", "vehicle", "forklift", "transport",
-        "road risk", "speeding", "driving safety"
+        "driving", "vehicle", "forklift", "transport", "haul truck",
+        "road risk", "speeding", "driving safety", "reversing truck"
     ],
     "Excavation": [
         "excavation", "trenching", "digging", "underground utility",
-        "collapse", "cave-in"
+        "collapse", "cave-in", "trench"
     ],
     "Pressure Systems": [
         "pressure", "pipeline", "valve", "pressurized",
-        "relief valve", "pressure vessel", "blowout"
+        "relief valve", "pressure vessel", "blowout", "high pressure water"
     ],
 }
 
@@ -56,31 +66,42 @@ HAZARD_PATTERNS = {
     ],
     "Fall from Height": [
         "fall from height", "fall risk", "falling", "dropped",
-        "slipped from", "fell off", "tripped"
+        "slipped from", "fell off", "tripped", "fell 10", "fell 15", "fell 20",
+        "fell from scaffold", "fell from ladder"
     ],
     "Electrical Hazard": [
         "electric shock", "electrocution", "arc flash", "live electrical",
-        "voltage", "shock hazard"
+        "voltage", "shock hazard", "electrical fire"
+    ],
+    "Machinery Entanglement": [
+        "entanglement", "nip point", "pinch point", "rotating shaft",
+        "pulley", "conveyor", "machine jam", "in-running nip", "machine rollers",
+        "clearing jammed", "clearing jam", "stamping press"
     ],
     "Caught in / Between": [
         "caught in", "caught between", "pinch point", "entanglement",
-        "rotating equipment", "nip point"
+        "rotating equipment", "nip point", "pinned between", "crushed between",
+        "trapped by", "arm caught", "hand caught", "finger caught", "severed"
+    ],
+    "Suspended Load": [
+        "suspended load", "dropped load", "crane lift", "rigging failure",
+        "overhead load", "load slipped"
     ],
     "Struck By": [
         "struck by", "hit by", "falling object", "dropped object",
-        "projectile", "impact"
+        "projectile", "impact", "flying debris"
     ],
     "Fire / Explosion": [
         "fire", "explosion", "ignition", "flammable", "combustible",
-        "flash fire", "deflagration"
+        "flash fire", "deflagration", "blast"
     ],
     "Chemical Exposure": [
         "chemical", "acid", "caustic", "corrosive", "solvent",
-        "toxic chemical", "chemical splash"
+        "toxic chemical", "chemical splash", "skin burn"
     ],
     "Crush / Collapse": [
         "crush", "collapse", "trench collapse", "wall collapse",
-        "structure failure"
+        "structure failure", "crushed hand", "crushed leg", "pinned against"
     ],
 }
 
@@ -92,7 +113,7 @@ UNSAFE_ACT_PATTERNS = {
     "No Fall Protection": [
         "no harness", "without harness", "no fall protection",
         "no safety belt", "missing fall arrest", "no anchor point",
-        "without fall protection"
+        "without fall protection", "unclipped harness"
     ],
     "No Permit": [
         "no permit", "without permit", "permit not obtained",
@@ -102,7 +123,8 @@ UNSAFE_ACT_PATTERNS = {
     ],
     "Bypassed Safety Device": [
         "bypassed", "removed safety", "disabled alarm",
-        "defeated interlock", "bypassed guard", "removed guard"
+        "defeated interlock", "bypassed guard", "removed guard",
+        "guard removed", "safety interlock defeated"
     ],
     "Unauthorized Entry": [
         "unauthorized entry", "entered without authorization",
@@ -114,7 +136,8 @@ UNSAFE_ACT_PATTERNS = {
     ],
     "No Isolation": [
         "no isolation", "without isolation", "not isolated",
-        "live system", "energized without isolation"
+        "live system", "energized without isolation",
+        "without lockout", "no lockout", "no tagout", "without loto"
     ],
 }
 
@@ -126,7 +149,18 @@ BARRIER_FAILURE_PATTERNS = {
     ],
     "Fall Protection System Absent": [
         "no fall protection", "fall arrest missing", "no harness",
-        "guardrail missing", "no safety net", "handrail absent"
+        "guardrail missing", "no safety net", "handrail absent",
+        "without harness", "unclipped harness"
+    ],
+    "Lockout / Tagout Bypassed": [
+        "without lockout", "no lockout", "no tagout", "loto bypassed",
+        "not locked out", "without loto", "energized state",
+        "lockout tagout not performed", "without de-energizing", "isolation not applied"
+    ],
+    "Machine Guarding Missing / Defeated": [
+        "guard removed", "no guard", "guard missing", "interlock bypassed",
+        "safety switch defeated", "unguarded nip", "unguarded blade",
+        "machine guard removed", "bypassed guard"
     ],
     "Permit-to-Work Not Followed": [
         "permit not followed", "no permit to work", "permit missing",
@@ -157,8 +191,12 @@ INCIDENT_TYPE_PATTERNS = {
         "near miss", "close call", "almost", "narrowly avoided",
         "near-miss", "near accident", "potential incident"
     ],
+    "Severe Injury": [
+        "amputation", "amputated", "fracture", "fractured", "hospitalized",
+        "skull fracture", "severed", "intensive care", "crushed"
+    ],
     "First Aid": [
-        "first aid", "minor injury", "cut", "bruise", "abrasion"
+        "first aid", "minor injury", "cut", "bruise", "abrasion", "scratch"
     ],
     "Unsafe Condition": [
         "unsafe condition", "hazardous condition", "dangerous situation",
@@ -178,18 +216,24 @@ LOCATION_PATTERNS = [
     r"\bsite\s*[a-zA-Z0-9]+\b",
     r"\bblock\s*[a-zA-Z0-9]+\b",
     r"\bunit\s*[a-zA-Z0-9]+\b",
+    r"\bbay\s*[a-zA-Z0-9]+\b",
+    r"\bline\s*[a-zA-Z0-9]+\b",
     r"\bplatform\s*[a-zA-Z0-9]*\b",
     r"\bplant\s*[a-zA-Z0-9]*\b",
     r"\bwarehouse\s*[a-zA-Z0-9]*\b",
+    r"\brefinery\b",
+    r"\bfoundry\b",
+    r"\bsubstation\b",
     r"\boffshore\b",
     r"\bonshore\b",
-    r"\brefinery\b",
     r"\bdrilling\b",
     r"\bwell\s*[a-zA-Z0-9]+\b",
     r"\bfacility\b",
     r"\bprocess\s*area\b",
     r"\butility\s*area\b",
     r"\bcontrol\s*room\b",
+    r"\bloading\s*dock\b",
+    r"\bcompressor\s*station\b",
 ]
 
 
@@ -217,7 +261,9 @@ def _extract_location(text: str) -> str:
         return "Rooftop Area"
     if "basement" in text:
         return "Basement Level"
-    return "Unspecified Location"
+    if "conveyor" in text or "press" in text:
+        return "Manufacturing Floor Bay 2"
+    return "Industrial Facility Site A"
 
 
 def analyze(text: str) -> dict:

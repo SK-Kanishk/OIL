@@ -1,0 +1,11 @@
+{
+  "name": "sif-sense-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix sif-sense/frontend run dev",
+    "build": "npm --prefix sif-sense/frontend run build",
+    "preview": "npm --prefix sif-sense/frontend run preview",
+    "start": "npm --prefix sif-sense/frontend run dev"
+  }
+}

@@ -22,11 +22,19 @@ export const reviewAlert = (alertId, action, notes) =>
   api.patch(`/alerts/${alertId}/review`, { action, notes });
 
 export const getModelMetrics = () => api.get('/model/metrics');
+export const getModelStatus = () => api.get('/model/status');
 export const getOshaSamples = () => api.get('/osha/samples');
 export const quickPredict = (text) => api.post('/model/predict', { text });
+
+// Procedural Incident Simulator API
+export const generateSimulatedIncident = (severity = 'ANY') =>
+  api.post('/simulator/generate', { severity });
+export const feedSimulatedIncident = (severity = 'ANY') =>
+  api.post('/simulator/feed', { severity });
+export const batchSimulate = (count = 5, severity = 'ANY') =>
+  api.post('/simulator/batch', { count, severity });
 
 export const getDatabaseStatus = () => api.get('/database/status');
 export const updateDatabaseConnection = (data) => api.post('/database/connect', data);
 
 export default api;
-

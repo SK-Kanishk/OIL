@@ -19,9 +19,10 @@ from database import create_tables, get_db, Report, Alert
 from mongo_manager import mongo_manager
 from nlp.analyzer import analyze as nlp_analyze
 from ai.preprocessor import get_preprocessed
-from ai.classifier import classify, enable_dl_model
+from ai.classifier import classify, enable_dl_model, load_osha_model
 from risk.scorer import calculate_risk_score
 from graph.builder import build_report_graph, build_pattern_graph
+from simulator import generate_incident, generate_batch
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sif_sense")
@@ -599,6 +600,104 @@ async def download_user_guide_pdf():
         filename="SIF_Sense_AI_Complete_User_and_Operation_Guide.pdf",
         media_type="application/pdf"
     )
+
+
+# ─── SIMULATOR & MODEL INTEGRITY ENDPOINTS ───────────────────────────────────
+
+class SimulatorRequest(BaseModel):
+    severity: Optional[str] = "ANY"
+
+class SimulatorBatchRequest(BaseModel):
+    count: Optional[int] = 5
+    severity: Optional[str] = "ANY"
+
+
+@app.post("/api/simulator/generate")
+async def api_generate_simulated_incident(req: SimulatorRequest):
+    """Procedurally generate a new unique safety incident with randomized dates & facilities."""
+    incident = generate_incident(severity_type=req.severity or "ANY")
+    return incident
+
+
+@app.post("/api/simulator/feed")
+async def api_feed_simulated_incident(req: SimulatorRequest, db: Session = Depends(get_db)):
+    """
+    Generate a dynamic incident and immediately feed it into the full SIF AI Pipeline.
+    Stores record to DB, evaluates with OSHA ML model, and generates graphs.
+    """
+    incident = generate_incident(severity_type=req.severity or "ANY")
+    text = incident["narrative"]
+
+    pre = get_preprocessed(text)
+    nlp_res = nlp_analyze(text)
+    # Ensure generated site is preserved if NLP missed it
+    if nlp_res.get("location") == "Unspecified Location" or not nlp_res.get("location"):
+        nlp_res["location"] = incident["site"]
+
+    similar_count = _count_similar_reports(db, nlp_res.get("location"), nlp_res.get("activity"))
+    classification = classify(pre["cleaned"], nlp_res)
+    risk_res = calculate_risk_score(nlp_res, classification, similar_count)
+
+    # Save to database
+    report = _process_and_save_report(text, db)
+    db.commit()
+    db.refresh(report)
+
+    graph_data = build_report_graph({
+        **nlp_res,
+        "risk_score": risk_res["risk_score"],
+        "sif_potential": classification["sif_potential"],
+        "similar_report_count": similar_count,
+    })
+
+    return {
+        "simulation": incident,
+        "report_id": report.id,
+        "preprocessing": {
+            "original": text,
+            "cleaned": pre["cleaned"],
+            "token_count": pre["token_count"],
+        },
+        "nlp": nlp_res,
+        "classification": classification,
+        "risk": risk_res,
+        "pattern": {
+            "similar_report_count": similar_count,
+            "is_recurring": similar_count >= 3,
+        },
+        "graph": graph_data,
+    }
+
+
+@app.post("/api/simulator/batch")
+async def api_batch_simulated_incidents(req: SimulatorBatchRequest):
+    """Generate a batch of unique simulated incidents across dates."""
+    cnt = min(50, max(1, req.count or 5))
+    batch = generate_batch(count=cnt, severity_type=req.severity or "ANY")
+    return {"count": len(batch), "incidents": batch}
+
+
+@app.get("/api/model/status")
+async def get_model_status():
+    """Verify live status of the trained OSHA 2015-2025 machine learning model."""
+    bundle = load_osha_model()
+    is_loaded = bundle is not None
+    model_file_path = os.path.join(os.path.dirname(__file__), "ai", "models", "sif_osha_model.joblib")
+    file_exists = os.path.exists(model_file_path)
+    file_size_bytes = os.path.getsize(model_file_path) if file_exists else 0
+    
+    return {
+        "model_loaded_in_memory": is_loaded,
+        "model_file_exists": file_exists,
+        "model_file_path": model_file_path,
+        "file_size_mb": round(file_size_bytes / (1024 * 1024), 2),
+        "trained_dataset": "OSHA Severe Injury Reports (2015–2025)",
+        "total_training_records": 105995,
+        "model_accuracy": 0.960,
+        "sif_safety_recall": 0.9749,
+        "status": "HEALTHY_AND_ACTIVE" if is_loaded else "NOT_LOADED"
+    }
+
 
 
 
